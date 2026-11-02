@@ -97,6 +97,7 @@ export function checkpointSession({
   goal = null,
   confidence = null,
   resumeRecipe = null,
+  usage = null,
 }) {
   const kind = CHECKPOINT_TRIGGERS[trigger];
   if (!kind) throw new Error(`brayer: unknown checkpoint trigger: ${trigger}`);
@@ -112,6 +113,7 @@ export function checkpointSession({
     treeHash,
     actor: sessionIdentity(session),
   });
+  if (usage) store.attempt.reportUsage({ attemptId, ...usage });
   return checkpoint;
 }
 
@@ -161,11 +163,11 @@ export function finishSession({
   attemptId,
   status = "finished",
   summary = null,
-  tokensIn = 0,
-  tokensOut = 0,
-  cacheRead = 0,
-  costUsd = 0,
-  toolCalls = 0,
+  tokensIn,
+  tokensOut,
+  cacheRead,
+  costUsd,
+  toolCalls,
   error = null,
   checkpointId = null,
 }) {

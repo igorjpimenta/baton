@@ -32,6 +32,21 @@ export const attemptDefs = [
     },
   },
   {
+    name: "brayer_attempt_report_usage",
+    description:
+      "Add usage deltas to a running attempt. Deltas accumulate; omitted finish totals preserve what was reported.",
+    shape: {
+      ...identityShape,
+      attemptId: z.string(),
+      model: z.optional(z.string()),
+      tokensIn: z.optional(z.int()),
+      tokensOut: z.optional(z.int()),
+      cacheRead: z.optional(z.int()),
+      costUsd: z.optional(z.number()),
+      toolCalls: z.optional(z.int()),
+    },
+  },
+  {
     name: "brayer_attempt_get",
     description: "Read one attempt. Read-only.",
     shape: {
@@ -57,13 +72,25 @@ export const attemptHandlers = {
       attemptId: args.attemptId,
       status: args.status,
       summary: args.summary ?? null,
+      tokensIn: args.tokensIn,
+      tokensOut: args.tokensOut,
+      cacheRead: args.cacheRead,
+      costUsd: args.costUsd,
+      toolCalls: args.toolCalls,
+      error: args.error ?? null,
+      checkpointId: args.checkpointId ?? null,
+    });
+  },
+
+  brayer_attempt_report_usage({ store, args }) {
+    return store.attempt.reportUsage({
+      attemptId: args.attemptId,
+      model: args.model ?? null,
       tokensIn: args.tokensIn ?? 0,
       tokensOut: args.tokensOut ?? 0,
       cacheRead: args.cacheRead ?? 0,
       costUsd: args.costUsd ?? 0,
       toolCalls: args.toolCalls ?? 0,
-      error: args.error ?? null,
-      checkpointId: args.checkpointId ?? null,
     });
   },
 

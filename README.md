@@ -76,7 +76,7 @@ The MCP tools are:
 | Area | Tools |
 | --- | --- |
 | Orders | `brayer_order_create`, `brayer_order_get`, `brayer_order_next`, `brayer_order_claim`, `brayer_order_heartbeat`, `brayer_order_resume` |
-| Attempts | `brayer_attempt_start`, `brayer_attempt_finish`, `brayer_attempt_get` |
+| Attempts | `brayer_attempt_start`, `brayer_attempt_finish`, `brayer_attempt_report_usage`, `brayer_attempt_get` |
 | Handoff | `brayer_checkpoint_write`, `brayer_checkpoint_get` |
 | Evidence | `brayer_evidence_attach`, `brayer_evidence_list` |
 | Verdict | `brayer_verdict_issue`, `brayer_verdict_list` |

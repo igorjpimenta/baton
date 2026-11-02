@@ -36,7 +36,7 @@ test("serves MCP over HTTP behind bearer auth", async () => {
     await client.connect(transport);
     try {
       const { tools } = await client.listTools();
-      assert.equal(tools.length, 15);
+      assert.equal(tools.length, 16);
     } finally {
       await client.close();
     }
