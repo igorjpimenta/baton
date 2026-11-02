@@ -111,6 +111,21 @@ test("finishes an attempt", () => withStore((store) => {
   assert.equal(finished.order.status, "review");
 }));
 
+test("captures usage with checkpoints and preserves it through finish", () => withStore((store) => {
+  const order = readyOrder(store);
+  const attached = attachSession({ store, session, orderId: order.id });
+  checkpointSession({
+    store, session, orderId: order.id, attemptId: attached.attempt.id,
+    state: { next_step: "continue" }, treeHash: "tree-1",
+    usage: { tokensIn: 40, tokensOut: 20, toolCalls: 2, costUsd: 0.005 },
+  });
+  const finished = finishSession({ store, session, attemptId: attached.attempt.id, summary: "done" });
+  assert.equal(finished.attempt.tokensIn, 40);
+  assert.equal(finished.attempt.tokensOut, 20);
+  assert.equal(finished.attempt.toolCalls, 2);
+  assert.equal(finished.attempt.costUsd, 0.005);
+}));
+
 test("requires a complete session", () => withStore((store) => {
   const order = readyOrder(store);
   assert.throws(() => attachSession({ store, session: { harness: "opencode" }, orderId: order.id }), /requires harness, agent and session/);

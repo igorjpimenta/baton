@@ -49,15 +49,60 @@ export function createAttemptApi({ db, insertEvent, orderApi, clearExpiry }) {
       }
     },
 
-    finish({
+    reportUsage({
       attemptId,
-      status,
-      summary = null,
+      model = null,
       tokensIn = 0,
       tokensOut = 0,
       cacheRead = 0,
       costUsd = 0,
       toolCalls = 0,
+    } = {}) {
+      if (!attemptId) throw new Error("attemptId is required");
+      for (const [name, value] of Object.entries({ tokensIn, tokensOut, cacheRead, costUsd, toolCalls })) {
+        if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be a non-negative number`);
+      }
+      for (const [name, value] of Object.entries({ tokensIn, tokensOut, cacheRead, toolCalls })) {
+        if (!Number.isInteger(value)) throw new Error(`${name} must be an integer`);
+      }
+      const t = now();
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const attempt = attemptApi.get(attemptId);
+        if (!attempt) { db.exec("ROLLBACK"); return { attempt: null, order: null, reason: "not_found" }; }
+        if (attempt.status !== "running") { db.exec("ROLLBACK"); return { attempt, order: orderApi.get(attempt.workOrderId), reason: "not_running" }; }
+
+        db.prepare(`
+          UPDATE attempts
+             SET model=COALESCE(?, model),
+                 tokens_in=tokens_in+?, tokens_out=tokens_out+?, cache_read=cache_read+?,
+                 cost_usd=cost_usd+?, tool_calls=tool_calls+?
+           WHERE id=? AND status='running'
+        `).run(model, tokensIn, tokensOut, cacheRead, costUsd, toolCalls, attemptId);
+
+        insertEvent({
+          workOrderId: attempt.workOrderId, attemptId, fromStatus: "running", toStatus: "running",
+          kind: "attempt.usage", actor: attempt.agent,
+          note: `usage +${tokensIn}/+${tokensOut} in/out, +${toolCalls} tools, +$${costUsd}`,
+          sessionRef: attempt.sessionRef, at: t,
+        });
+        db.exec("COMMIT");
+        return { attempt: attemptApi.get(attemptId), order: orderApi.get(attempt.workOrderId), reason: null };
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+    },
+
+    finish({
+      attemptId,
+      status,
+      summary = null,
+      tokensIn,
+      tokensOut,
+      cacheRead,
+      costUsd,
+      toolCalls,
       error = null,
       checkpointId = null,
     } = {}) {
@@ -71,12 +116,30 @@ export function createAttemptApi({ db, insertEvent, orderApi, clearExpiry }) {
         if (attempt.status !== "running") { db.exec("ROLLBACK"); return { attempt, order: orderApi.get(attempt.workOrderId), reason: "not_running" }; }
 
         const nextCheckpointId = checkpointId ?? attempt.checkpointId;
+        const nextUsage = {
+          tokensIn: tokensIn ?? attempt.tokensIn,
+          tokensOut: tokensOut ?? attempt.tokensOut,
+          cacheRead: cacheRead ?? attempt.cacheRead,
+          costUsd: costUsd ?? attempt.costUsd,
+          toolCalls: toolCalls ?? attempt.toolCalls,
+        };
+        for (const [name, value] of Object.entries(nextUsage)) {
+          if (!Number.isFinite(value) || value < 0) throw new Error(`${name} must be a non-negative number`);
+        }
+        for (const [name, value] of Object.entries({
+          tokensIn: nextUsage.tokensIn,
+          tokensOut: nextUsage.tokensOut,
+          cacheRead: nextUsage.cacheRead,
+          toolCalls: nextUsage.toolCalls,
+        })) {
+          if (!Number.isInteger(value)) throw new Error(`${name} must be an integer`);
+        }
         db.prepare(`
           UPDATE attempts
              SET status=?, ended_at=?, tokens_in=?, tokens_out=?, cache_read=?, cost_usd=?,
                  tool_calls=?, error=?, checkpoint_id=?
            WHERE id=? AND status='running'
-        `).run(status, t, tokensIn, tokensOut, cacheRead, costUsd, toolCalls, error, nextCheckpointId, attemptId);
+        `).run(status, t, nextUsage.tokensIn, nextUsage.tokensOut, nextUsage.cacheRead, nextUsage.costUsd, nextUsage.toolCalls, error, nextCheckpointId, attemptId);
 
         const order = orderApi.get(attempt.workOrderId);
         const nextStatus = status === "finished" ? "review" : "ready";

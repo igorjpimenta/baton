@@ -70,3 +70,61 @@ test("finish preserves an existing checkpoint link when checkpointId is omitted"
   const finished = store.attempt.finish({ attemptId: attempt.id, status: "finished" });
   assert.equal(finished.attempt.checkpointId, checkpoint.id);
 }));
+
+test("accumulates reported usage and preserves it when finish omits totals", () => withStore((store) => {
+  const { attempt } = runningAttempt(store);
+  const first = store.attempt.reportUsage({
+    attemptId: attempt.id,
+    model: "sonnet",
+    tokensIn: 100,
+    tokensOut: 50,
+    cacheRead: 10,
+    costUsd: 0.012,
+    toolCalls: 3,
+  });
+  assert.equal(first.reason, null);
+  assert.equal(first.attempt.model, "sonnet");
+  assert.equal(first.attempt.tokensIn, 100);
+  assert.equal(first.attempt.toolCalls, 3);
+  const second = store.attempt.reportUsage({
+    attemptId: attempt.id,
+    tokensIn: 25,
+    tokensOut: 25,
+    costUsd: 0.008,
+    toolCalls: 2,
+  });
+  assert.equal(second.attempt.tokensIn, 125);
+  assert.equal(second.attempt.tokensOut, 75);
+  assert.equal(second.attempt.costUsd, 0.02);
+  assert.equal(second.attempt.toolCalls, 5);
+  const finished = store.attempt.finish({ attemptId: attempt.id, status: "finished" });
+  assert.equal(finished.attempt.tokensIn, 125);
+  assert.equal(finished.attempt.tokensOut, 75);
+  assert.equal(finished.attempt.costUsd, 0.02);
+  assert.equal(finished.attempt.toolCalls, 5);
+}));
+
+test("finish totals override accumulated usage when provided", () => withStore((store) => {
+  const { attempt } = runningAttempt(store);
+  store.attempt.reportUsage({ attemptId: attempt.id, tokensIn: 100, toolCalls: 3 });
+  const finished = store.attempt.finish({
+    attemptId: attempt.id,
+    status: "finished",
+    tokensIn: 150,
+    tokensOut: 75,
+    cacheRead: 5,
+    costUsd: 0.03,
+    toolCalls: 7,
+  });
+  assert.equal(finished.attempt.tokensIn, 150);
+  assert.equal(finished.attempt.toolCalls, 7);
+}));
+
+test("refuses invalid or finished usage reports", () => withStore((store) => {
+  const { attempt } = runningAttempt(store);
+  assert.throws(() => store.attempt.reportUsage({ attemptId: attempt.id, tokensIn: -1 }), /non-negative number/);
+  assert.throws(() => store.attempt.reportUsage({ attemptId: attempt.id, toolCalls: 1.5 }), /must be an integer/);
+  assert.throws(() => store.attempt.reportUsage({}), /attemptId is required/);
+  store.attempt.finish({ attemptId: attempt.id, status: "failed" });
+  assert.equal(store.attempt.reportUsage({ attemptId: attempt.id, toolCalls: 1 }).reason, "not_running");
+}));
