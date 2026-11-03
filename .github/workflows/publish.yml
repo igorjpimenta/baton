@@ -38,7 +38,7 @@ jobs:
             exit 1
           fi
           TAG_DATE="$(printf '%s' "${TAG%%-*}" | tr . -)"
-          UTC_DATE="$(date -u +%Y-%m-%d)"
+          UTC_DATE="$(date -u +%Y-%-m-%-d)"
           if [ "$TAG_DATE" != "$UTC_DATE" ]; then
             echo "::error::tag date $TAG_DATE != UTC date $UTC_DATE"
             exit 1
@@ -92,7 +92,7 @@ jobs:
             exit 1
           fi
           TAG_DATE="$(printf '%s' "${TAG%%-*}" | tr . -)"
-          UTC_DATE="$(date -u +%Y-%m-%d)"
+          UTC_DATE="$(date -u +%Y-%-m-%-d)"
           if [ "$TAG_DATE" != "$UTC_DATE" ]; then
             echo "::error::tag date $TAG_DATE != UTC date $UTC_DATE"
             exit 1
@@ -146,7 +146,7 @@ jobs:
             exit 1
           fi
           TAG_DATE="$(printf '%s' "${TAG%%-*}" | tr . -)"
-          UTC_DATE="$(date -u +%Y-%m-%d)"
+          UTC_DATE="$(date -u +%Y-%-m-%-d)"
           if [ "$TAG_DATE" != "$UTC_DATE" ]; then
             echo "::error::tag date $TAG_DATE != UTC date $UTC_DATE"
             exit 1
