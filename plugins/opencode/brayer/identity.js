@@ -1,3 +1,9 @@
+// identity.js — opencode can mutate tool args but not request _meta, so the
+// brayer server accepts a whole agent+session pair as brayer_agent/
+// brayer_session args (src/identity.js, args channel). The hook overwrites
+// both unconditionally: a model-supplied pair must never survive. The harness
+// is not an argument — the MCP connection declares it via X-Brayer-Harness.
+
 export function isBrayerTool(name) {
   return typeof name === "string" && name.includes("brayer");
 }
@@ -5,7 +11,7 @@ export function isBrayerTool(name) {
 export function stampBrayerIdentity(input, output, { agent = null } = {}) {
   if (!isBrayerTool(input?.tool)) return false;
   output.args = output.args ?? {};
-  if (!output.args.brayer_agent && agent) output.args.brayer_agent = agent;
-  if (!output.args.brayer_session) output.args.brayer_session = input.sessionID;
+  if (agent) output.args.brayer_agent = agent;
+  if (input?.sessionID) output.args.brayer_session = input.sessionID;
   return true;
 }

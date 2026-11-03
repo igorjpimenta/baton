@@ -1,5 +1,5 @@
 import http from "node:http";
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -63,6 +63,27 @@ export async function startMcpHttpServer({
   logger,
 } = {}) {
   if (!bearer) throw new Error("brayer: BRAYER_MCP_BEARER is required for HTTP");
+
+  // Shared HTTP mint: one process serves every harness. The first request on
+  // a session declares the harness via the X-Brayer-Harness header — set by
+  // the harness's own client config, never by the model — and that session
+  // keeps the declaration for its lifetime. Later session requests replay to
+  // the same server; the header is only consulted at minting.
+  const sessions = new Map();
+
+  async function readBody(req) {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = Buffer.concat(chunks);
+    if (!body.length) return undefined;
+    return JSON.parse(body.toString("utf8"));
+  }
+
+  async function dispatch(req, res, entry) {
+    const body = await readBody(req);
+    await entry.transport.handleRequest(req, res, body);
+  }
+
   const server = http.createServer(async (req, res) => {
     if (req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
@@ -87,22 +108,52 @@ export async function startMcpHttpServer({
       return;
     }
 
-    const mcp = createMcpServer({ store, base, logger });
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const sid = req.headers["mcp-session-id"];
+    if (typeof sid === "string" && sessions.has(sid)) {
+      try {
+        await dispatch(req, res, sessions.get(sid));
+      } catch (err) {
+        logger?.warn?.(`brayer: HTTP MCP failed: ${err?.message ?? err}`);
+        if (!res.headersSent) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32603, message: "Internal server error" }, id: null }));
+        }
+      }
+      return;
+    }
+
+    // New session: read the declared harness, refuse unusable names, then
+    // mint the session-scoped server and register it by response header.
+    const header = req.headers["x-brayer-harness"];
+    const headerValue = Array.isArray(header) ? header[0] : header;
+    let minted;
+    try {
+      minted = assertDeclaration({ harness: headerValue });
+    } catch {
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "missing or reserved X-Brayer-Harness" }));
+      return;
+    }
+    const mcp = createMcpServer({ store, base: minted, logger });
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (id) => sessions.set(id, { server: mcp, transport }),
+    });
+    transport.onclose = () => {
+      for (const [id, entry] of sessions) {
+        if (entry.transport === transport) sessions.delete(id);
+      }
+    };
     try {
       await mcp.connect(transport);
-      await transport.handleRequest(req, res);
+      await dispatch(req, res, { transport });
     } catch (err) {
+      mcp.close();
       logger?.warn?.(`brayer: HTTP MCP failed: ${err?.message ?? err}`);
       if (!res.headersSent) {
         res.writeHead(500, { "content-type": "application/json" });
         res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32603, message: "Internal server error" }, id: null }));
       }
-    } finally {
-      res.on("close", () => {
-        transport.close();
-        mcp.close();
-      });
     }
   });
   await new Promise((resolve, reject) => {

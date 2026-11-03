@@ -14,5 +14,5 @@ test("refuses an unstamped call", () => withClient(async ({ client }) => {
     arguments: { title: "x", goal: "y", acceptance: "z" },
   });
   assert.equal(res.isError, true);
-  assert.match(res.content[0].text, /agent must be stamped/);
+  assert.match(res.content[0].text, /must be stamped on the call/);
 }));
