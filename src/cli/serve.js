@@ -7,10 +7,11 @@ export async function runServe({ rest, env }) {
   const mcpIndex = rest.indexOf("--mcp");
   const transport = mcpIndex >= 0 ? rest[mcpIndex + 1] : null;
   if (transport) {
-    if (!env.BRAYER_HARNESS) throw new Error("brayer: BRAYER_HARNESS is required for MCP");
+    const base = env.BRAYER_HARNESS ? { harness: env.BRAYER_HARNESS } : undefined;
     const store = createStore({ dbPath: env.BRAYER_DB || undefined });
     if (transport === "stdio") {
-      await startMcpServer({ store, base: { harness: env.BRAYER_HARNESS } });
+      if (!base) throw new Error("brayer: BRAYER_HARNESS is required for stdio MCP");
+      await startMcpServer({ store, base });
       return;
     }
     if (transport === "http") {
@@ -19,7 +20,7 @@ export async function runServe({ rest, env }) {
       const host = flagValue(rest, "--host") ?? "127.0.0.1";
       await startMcpHttpServer({
         store,
-        base: { harness: env.BRAYER_HARNESS },
+        base,
         port,
         host,
         bearer: env.BRAYER_MCP_BEARER,
