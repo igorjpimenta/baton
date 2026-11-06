@@ -193,9 +193,10 @@ An adapter attaches an existing order; it never creates work.
 
 **OpenClaw** — `@igorjpimenta/brayer-openclaw` stamps `_meta.brayer`, checkpoints
 on turn end, resumes from the latest checkpoint, and receives claim webhooks at
-`POST /api/brayer/claimed`. The stamp also carries mirrored `brayer_agent`/
-`brayer_session` args, so identity holds on openclaw engines that predate the
-JSON-RPC `_meta` hoist (openclaw/openclaw#193006).
+`POST /api/brayer/claimed`. The hook declares the stamp on `requestMeta`, which
+current OpenClaw hoists to JSON-RPC request `_meta`
+(openclaw/openclaw#193006), and mirrors it on `brayer_agent`/`brayer_session`
+args for engines that predate the hoist.
 
 ```json
 {
