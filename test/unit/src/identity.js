@@ -19,7 +19,7 @@ test("meta stamp wins over args and no halves splice", () => {
     args: { brayer_agent: "spoofed", brayer_session: "spoofed" },
     base: { harness: "claude" },
   });
-  assert.deepEqual(id, { harness: "claude", agent: "worker", session: "s1" });
+  assert.deepEqual(id, { harness: "claude", agent: "worker", session: "s1", via: "meta" });
 });
 
 test("halves across channels refuse instead of splicing", () => {
@@ -41,6 +41,7 @@ test("args are a fallback when meta is unreachable", () => {
     base: { harness: "codex" },
   });
   assert.equal(identityKey(id), "codex:worker:s1");
+  assert.equal(id.via, "args");
 });
 
 test("missing agent or session refuses", () => {

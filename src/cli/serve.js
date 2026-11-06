@@ -3,7 +3,7 @@ import { startMcpHttpServer, startMcpServer } from "../mcp.js";
 import { startEventServer } from "../events-ws.js";
 import { flagValue } from "./args.js";
 
-export async function runServe({ rest, env }) {
+export async function runServe({ rest, env, logger }) {
   const mcpIndex = rest.indexOf("--mcp");
   const transport = mcpIndex >= 0 ? rest[mcpIndex + 1] : null;
   if (transport) {
@@ -11,7 +11,7 @@ export async function runServe({ rest, env }) {
     const store = createStore({ dbPath: env.BRAYER_DB || undefined });
     if (transport === "stdio") {
       if (!base) throw new Error("brayer: BRAYER_HARNESS is required for stdio MCP");
-      await startMcpServer({ store, base });
+      await startMcpServer({ store, base, logger });
       return;
     }
     if (transport === "http") {
@@ -24,6 +24,7 @@ export async function runServe({ rest, env }) {
         port,
         host,
         bearer: env.BRAYER_MCP_BEARER,
+        logger,
       });
       return;
     }
