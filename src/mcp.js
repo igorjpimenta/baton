@@ -27,7 +27,8 @@ export function createMcpServer({ store, base, logger } = {}) {
       async (args, extra) => {
         try {
           const identity = resolveIdentity({ meta: extra?._meta, args, base: declared });
-          logger?.info?.(`brayer: ${def.name} from ${identity.harness}:${identity.agent}:${identity.session}`);
+          const metaKeys = extra?._meta ? Object.keys(extra._meta).sort().join(",") : "-";
+          logger?.info?.(`brayer: ${def.name} from ${identity.harness}:${identity.agent}:${identity.session} via=${identity.via} metaKeys=${metaKeys}`);
           const result = await handle(def.name, args, identity);
           return { content: [{ type: "text", text: JSON.stringify(result) }] };
         } catch (err) {

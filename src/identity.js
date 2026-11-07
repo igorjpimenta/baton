@@ -37,9 +37,9 @@ export function resolveIdentity({ meta, args, base } = {}) {
   const aSession = usable(args?.brayer_session);
   const pair =
     mAgent && mSession
-      ? { agent: mAgent, session: mSession }
+      ? { agent: mAgent, session: mSession, via: "meta" }
       : aAgent && aSession
-        ? { agent: aAgent, session: aSession }
+        ? { agent: aAgent, session: aSession, via: "args" }
         : null;
   if (!pair) {
     if ((mAgent || aAgent) && (mSession || aSession)) {
@@ -51,7 +51,7 @@ export function resolveIdentity({ meta, args, base } = {}) {
     throw new Error(`brayer: ${bad.join(" and ")} must be stamped on the call`);
   }
 
-  return { harness: declared.harness, agent: pair.agent, session: pair.session };
+  return { harness: declared.harness, agent: pair.agent, session: pair.session, via: pair.via };
 }
 
 export function identityKey(identity) {

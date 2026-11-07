@@ -13,27 +13,45 @@ test("stamps harness/agent/session from hook context", () => {
     { toolName: "mcp__brayer__brayer_order_get", params: { orderId: "WO-1" } },
     { agentId: "scout", sessionKey: "openclaw:scout:s1" }
   );
+  assert.deepEqual(out.requestMeta.brayer, {
+    harness: "openclaw",
+    agent: "scout",
+    session: "openclaw:scout:s1",
+  });
   assert.deepEqual(out.params._meta.brayer, {
     harness: "openclaw",
     agent: "scout",
     session: "openclaw:scout:s1",
   });
+  assert.deepEqual(out.params.brayer_agent, "scout");
+  assert.deepEqual(out.params.brayer_session, "openclaw:scout:s1");
   assert.equal(out.params.orderId, "WO-1");
 });
 
-test("overwrites forged identity", () => {
+test("overwrites forged identity on every channel", () => {
   const out = buildBrayerMeta(
     {
       toolName: "mcp__brayer__brayer_order_get",
-      params: { _meta: { brayer: { harness: "evil", agent: "mallory", session: "x" }, progressToken: "p1" } },
+      params: {
+        brayer_agent: "mallory",
+        brayer_session: "forged",
+        _meta: { brayer: { harness: "evil", agent: "mallory", session: "x" }, progressToken: "p1" },
+      },
     },
     { agentId: "scout", sessionId: "sid-1" }
   );
+  assert.deepEqual(out.requestMeta.brayer, {
+    harness: "openclaw",
+    agent: "scout",
+    session: "sid-1",
+  });
   assert.deepEqual(out.params._meta.brayer, {
     harness: "openclaw",
     agent: "scout",
     session: "sid-1",
   });
+  assert.deepEqual(out.params.brayer_agent, "scout");
+  assert.deepEqual(out.params.brayer_session, "sid-1");
   assert.equal(out.params._meta.progressToken, "p1");
 });
 
