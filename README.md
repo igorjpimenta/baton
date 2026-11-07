@@ -2,88 +2,164 @@
 
 **Ink the work, not the transcript.**
 
-Brayer is a vendor-neutral command layer for agent work. It records a work order,
-the attempts made against it, the handoff checkpoint, the evidence returned, and
-the verdict — so a fleet of coding agents can be supervised by exception instead
-of by transcript.
+<p align="center">
+  <a href="https://github.com/igorjpimenta/brayer/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/igorjpimenta/brayer/ci.yml?branch=main&style=flat-square&label=ci" alt="CI status"></a>
+  <a href="https://www.npmjs.com/package/@igorjpimenta/brayer"><img src="https://img.shields.io/npm/v/@igorjpimenta/brayer?style=flat-square&label=npm" alt="npm version"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/%40igorjpimenta%2Fbrayer?style=flat-square" alt="Node.js version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License: MIT"></a>
+</p>
 
-## Why Brayer
+Brayer is a vendor-neutral work-order desk for coding agents. It records the work order, the attempts made against it, the handoff checkpoint, the content-addressed evidence, and the verdict — so a fleet of coding agents can be supervised by exception instead of by transcript. Every call carries the identity of the agent that made it, stamped at the connection layer so the model itself is never trusted to say who it is.
 
-A brayer is the printer's small hand roller that applies ink evenly to type. It
-does not rewrite the page, and it does not keep the manuscript. It puts the ink
-exactly where the work needs it.
-
-Brayer does the same for agents. It applies context to the work — the order, the
-checkpoint, the proof, the decision — instead of piling another transcript into
-the context window.
-
-The product is a command layer, not another agent:
-
-- **Work order in** — goal, acceptance, workspace, budget, approval mode.
-- **Handoff out** — a structured checkpoint with a tree hash, not a transcript.
-- **Evidence attached** — diff, tests, screenshots, artifacts, all content-addressed.
+- **Work order in** — goal, acceptance criteria, workspace, budget, approval mode.
+- **Handoff out** — a structured checkpoint pinned to the workspace tree hash, not a transcript.
+- **Evidence attached** — diff, tests, screenshots, artifacts, all content-addressed by sha256.
 - **Verdict recorded** — approve, reject, escalate or rollback, with an audit event.
 - **Resume exact** — a leased attempt can die and continue in any harness without a re-brief.
 
-## Who it is for
+It is local-first and vendor-neutral: OpenCode, OpenClaw and future harnesses are adapters, not the product. A work order is self-contained — no external planner task id is required. Stable releases publish since `2026.11.7` ([release notes](docs/releases.md)).
 
-Technical operators who run several coding agents across repos and harnesses and
-need to supervise by exception, not by reading every trace. It is local-first and
-vendor-neutral: OpenCode, OpenClaw and future harnesses are adapters, not the
-product. It is also planning-system agnostic: a work order is
-self-contained, and no external planner task id is required.
-
-## Status
-
-Brayer is in active development. The MCP server, SQLite store, claim lease,
-attempts, checkpoints, evidence, verdicts, resume, event stream, HTTP MCP,
-claim webhooks and the OpenCode/OpenClaw identity plugins are implemented.
+[Why the name?](#why-the-name) · [npm: @igorjpimenta/brayer](https://www.npmjs.com/package/@igorjpimenta/brayer)
 
 ## Install
 
-Brayer is published to public npm:
+Requires Node.js 22+.
 
 ```sh
-npm install -g @igorjpimenta/brayer@beta
+npm install -g @igorjpimenta/brayer
 brayer --version
 ```
 
-## What works
+The harness adapters publish separately and can use the same or different Brayer
+versions than the daemon: [`@igorjpimenta/brayer-openclaw`](https://www.npmjs.com/package/@igorjpimenta/brayer-openclaw)
+and [`@igorjpimenta/brayer-opencode`](https://www.npmjs.com/package/@igorjpimenta/brayer-opencode).
+A `beta` dist-tag tracks prereleases (`YYYY.MM.DD-beta.N`) — see
+[releases](docs/releases.md).
+
+## Quick start
+
+One daemon serves every harness. Start it:
 
 ```sh
-# MCP over stdio for one harness
-BRAYER_HARNESS=opencode brayer serve --mcp stdio
-
-# MCP over HTTP with bearer auth
-BRAYER_HARNESS=openclaw BRAYER_MCP_BEARER=secret \
+BRAYER_MCP_BEARER=$(openssl rand -hex 32) \
   brayer serve --mcp http --port 38293
-
-# Event stream for dashboards and inboxes
-brayer serve --ws --port 38294
-
-# Read the queue
-brayer status
-brayer status --json
-
-# Register a claim wake target
-brayer webhook set --harness opencode \
-  --url http://127.0.0.1:38295/api/brayer/claimed --bearer secret
-brayer webhook test --harness opencode
 ```
 
-The MCP tools are:
+Point a harness at it and let the agent work an order — OpenClaw and OpenCode
+configs are in [Harnesses](#harnesses). Inside the agent's session:
 
-| Area | Tools |
-| --- | --- |
-| Orders | `brayer_order_create`, `brayer_order_get`, `brayer_order_next`, `brayer_order_claim`, `brayer_order_heartbeat`, `brayer_order_resume` |
-| Attempts | `brayer_attempt_start`, `brayer_attempt_finish`, `brayer_attempt_report_usage`, `brayer_attempt_get` |
-| Handoff | `brayer_checkpoint_write`, `brayer_checkpoint_get` |
-| Evidence | `brayer_evidence_attach`, `brayer_evidence_list` |
-| Verdict | `brayer_verdict_issue`, `brayer_verdict_list` |
+```
+brayer_order_create  { title: "refactor invoice parser", goal: "…",
+                       acceptance: "tests pass", status: "ready" }
+brayer_order_claim   { orderId: "WO-…" }     # identity is stamped by the plugin
+brayer_attempt_start { orderId }             # lease held, heartbeats keep it
+… work …
+brayer_evidence_attach / brayer_checkpoint_write
+brayer_attempt_finish → review → brayer_verdict_issue
+```
 
-## Flows
+Verify from the operator side — no transcript reading:
 
-### Order lifecycle
+```sh
+$ brayer status
+WO-lqcvx0si  refactor invoice parser   review   openclaw:main:agent:main:explicit:ses_x
+```
+
+All MCP tools and their contracts are defined in [`src/tools/`](src/tools/index.js) — or just list them from the running server.
+
+## How it fits together
+
+- The **Store** is one SQLite database (`~/.brayer/store.sqlite`) with content-addressed evidence blobs — the single source of truth, migrates applied on open.
+- The **MCP server** exposes the whole desk as Brayer tools over stdio (one pipe per harness) or streamable HTTP (one shared daemon). Identity is stamped at the transport edge.
+- The **Event stream** (`brayer serve --ws`) and claim webhooks notify dashboards and wake idle agents when work arrives.
+- **Harness adapters** (`@igorjpimenta/brayer-openclaw`, `@igorjpimenta/brayer-opencode`) stamp identity, checkpoint on turn end (OpenClaw), and receive claim webhooks. The optional `brayer-wake` bridge prompts an OpenCode session when a webhook fires.
+
+```
+harness agent ──MCP (stdio | HTTP + X-Brayer-Harness)── ▶ MCP server ──▶ SQLite store
+                                                            │  claim webhook / event stream
+                                                            ▼
+                                                      wake bridge → idle harness agent
+```
+
+## Identity
+
+Every call is keyed `harness:agent:session`, and the harness is declared per **connection**, never by the model:
+
+| Transport | Harness declared by | Example |
+| --- | --- | --- |
+| stdio | `BRAYER_HARNESS` env at launch | one pipe per harness |
+| HTTP | `X-Brayer-Harness` header on the session's first request | one shared daemon, all harnesses |
+
+The agent and session halves are stamped per call as a whole pair, in **one** channel: either `_meta.brayer` (`{ agent, session, harness }`) or flat `brayer_agent` / `brayer_session` arguments — halves never splice across channels. Mutating calls without a full pair refuse; the adapters do this stamping automatically. The harness name `any` is reserved and refused. See [lifecycle](docs/lifecycle.md) for the exact refusal contract.
+
+## Harnesses
+
+An adapter attaches an existing order; it never creates work.
+
+**OpenClaw** — `@igorjpimenta/brayer-openclaw` stamps `_meta.brayer`, checkpoints on turn end, resumes from the latest checkpoint, and receives claim webhooks at `POST /api/brayer/claimed`.
+
+```sh
+openclaw plugins install npm:@igorjpimenta/brayer-openclaw@latest
+```
+
+One daemon for all harnesses (recommended):
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "brayer": {
+        "url": "http://127.0.0.1:38293/mcp",
+        "headers": {
+          "X-Brayer-Harness": "openclaw",
+          "Authorization": "Bearer <BRAYER_MCP_BEARER>"
+        }
+      }
+    }
+  }
+}
+```
+
+One pipe per harness instead:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "brayer": {
+        "command": "brayer",
+        "args": ["serve", "--mcp", "stdio"],
+        "env": { "BRAYER_HARNESS": "openclaw" }
+      }
+    }
+  }
+}
+```
+
+**OpenCode** — `@igorjpimenta/brayer-opencode` stamps identity on every Brayer MCP tool call. It needs the Brayer MCP server configured and `BRAYER_AGENT` when the session agent cannot be captured.
+
+```json
+{
+  "mcp": {
+    "brayer": {
+      "type": "remote",
+      "url": "http://127.0.0.1:38293/mcp",
+      "headers": {
+        "X-Brayer-Harness": "opencode",
+        "Authorization": "Bearer <BRAYER_MCP_BEARER>"
+      }
+    }
+  },
+  "plugin": ["@igorjpimenta/brayer-opencode"]
+}
+```
+
+Automatic checkpoint/resume is not part of the OpenCode adapter; the agent uses
+the Brayer MCP tools directly. The optional `brayer-wake` bin receives the claim
+webhook and prompts the claiming session through the OpenCode SDK — see
+[webhooks and wake](docs/webhooks.md).
+
+## The order lifecycle
 
 An order moves from ready through a claim and a running attempt to review. The
 verdict decides where it lands, and resume returns rejected or blocked work to
@@ -104,152 +180,25 @@ flowchart LR
   H -->|resume| B
 ```
 
-### Claim and lease
+Claim leases, attempt caps, and the checkpoint/evidence validation rules: [lifecycle](docs/lifecycle.md).
 
-An agent claims a ready order, then keeps the lease alive with heartbeats. An
-expired lease returns to the queue or blocks at the attempt cap.
+## Documentation
 
-```mermaid
-flowchart LR
-  Q[Ready order] -->|claimNext / claimById| L{Lease won?}
-  L -->|no| Q
-  L -->|yes| H[Claimed with lease]
-  H -->|heartbeat| H
-  H -->|lease expired| E{Attempt cap?}
-  E -->|no| Q
-  E -->|yes| X[Blocked]
-```
+| Goal | Start here |
+| --- | --- |
+| Configure ports, bearer, store, webhooks | [Configuration](docs/configuration.md) |
+| Understand claim/lease/verdict rules | [Lifecycle](docs/lifecycle.md) |
+| Wake idle agents on claims | [Webhooks and wake bridge](docs/webhooks.md) |
+| Run it on a host persistently | [Docker](docs/docker.md) |
+| Publish a release | [Releases](docs/releases.md) |
 
-### Checkpoint and evidence
+## Why the name?
 
-The store validates the attempt and the handoff or proof before it records the
-row and emits the event.
-
-```mermaid
-flowchart LR
-  A[Running attempt] --> B{Belongs to order?}
-  B -->|no| R[Refuse]
-  B -->|yes| C{Valid state / tree hash / sha256?}
-  C -->|no| R
-  C -->|yes| D[Insert checkpoint or evidence]
-  D --> E[Emit event]
-```
-
-### Verdict and resume
-
-A verdict closes review or blocked work. Reject and escalate remain resumable;
-rollback returns the order to ready directly.
-
-```mermaid
-flowchart LR
-  A[Review or blocked] --> B{Decision}
-  B -->|approve| C[Approved]
-  B -->|reject| D[Rejected]
-  B -->|escalate| E[Blocked]
-  B -->|rollback| F[Ready]
-  D -->|resume| F
-  E -->|resume| F
-```
-
-## Storage
-
-- SQLite at `BRAYER_DB` or `~/.brayer/store.sqlite`
-- Content-addressed evidence at `BRAYER_BLOBS` or `~/.brayer/blobs/<sha256>`
-- Drizzle migrations in `.migrations/`, applied on open
-- WAL, foreign keys and a 5s busy timeout
-
-## Configuration
-
-Explicit config beats `BRAYER_*` env beats defaults. Integer knobs refuse
-malformed values; unknown explicit keys refuse as typos.
-
-| Knob | Env | Default |
-| --- | --- | --- |
-| Store | `BRAYER_DB` | `~/.brayer/store.sqlite` |
-| Blobs | `BRAYER_BLOBS` | `~/.brayer/blobs` |
-| Lease | `BRAYER_LEASE_SECONDS` | `1800` |
-| Attempt cap | `BRAYER_MAX_ATTEMPTS` | `3` |
-| HTTP port | `BRAYER_HTTP_PORT` | `38293` |
-| WS port | `BRAYER_WS_PORT` | `38294` |
-| HTTP MCP bearer | `BRAYER_MCP_BEARER` | required for HTTP |
-| Claim webhook URL | `BRAYER_CLAIM_WEBHOOK_URL` | unset |
-| Claim webhook bearer | `BRAYER_CLAIM_WEBHOOK_BEARER` | unset |
-| Claim webhook timeout | `BRAYER_CLAIM_WEBHOOK_TIMEOUT_MS` | `3000` |
-| Per-harness webhooks | `BRAYER_CLAIM_WEBHOOKS` | `{}` |
-| Wake bridge port | `BRAYER_WAKE_PORT` | `38295` |
-| Wake bridge bearer | `BRAYER_WAKE_BEARER` | unset |
-| OpenCode server URL | `BRAYER_OPENCODE_URL` | `http://127.0.0.1:4096` |
-
-## Identity
-
-Every call is keyed `harness:agent:session`. The harness is declared at
-construction (`BRAYER_HARNESS`); the agent and session are stamped per call via
-`_meta.brayer` with `brayer_agent` / `brayer_session` as the fallback. Missing or
-mismatched identity refuses the call.
-
-## Harnesses
-
-An adapter attaches an existing order; it never creates work.
-
-**OpenClaw** — `@igorjpimenta/brayer-openclaw` stamps `_meta.brayer`, checkpoints
-on turn end, resumes from the latest checkpoint, and receives claim webhooks at
-`POST /api/brayer/claimed`. The hook declares the stamp on `requestMeta`, which
-current OpenClaw hoists to JSON-RPC request `_meta`
-(openclaw/openclaw#193006), and mirrors it on `brayer_agent`/`brayer_session`
-args for engines that predate the hoist.
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "brayer": {
-        "command": "brayer",
-        "args": ["serve", "--mcp", "stdio"],
-        "env": { "BRAYER_HARNESS": "openclaw" }
-      }
-    }
-  }
-}
-```
-
-**OpenCode** — `@igorjpimenta/brayer-opencode` stamps agent/session identity on
-Brayer MCP tool calls. It needs the Brayer MCP server configured and
-`BRAYER_AGENT` when the session agent cannot be captured.
-
-```json
-{
-  "mcp": {
-    "brayer": {
-      "type": "remote",
-      "url": "http://127.0.0.1:38293/mcp",
-      "headers": { "Authorization": "Bearer secret" }
-    }
-  },
-  "plugin": ["@igorjpimenta/brayer-opencode"]
-}
-```
-
-Automatic checkpoint/resume is not part of this release; the agent uses the
-Brayer MCP tools directly.
-
-**Wake bridge** — the OpenCode package also ships the optional `brayer-wake` bin.
-It receives the claim webhook and prompts the claiming session through the
-OpenCode SDK.
-
-## Docker
-
-```sh
-BRAYER_MCP_BEARER=secret docker compose up --build
-```
-
-The image stores SQLite and blobs on the `brayer-data` volume at `/data`;
-HTTP MCP is exposed on 38293 and the event stream on 38294.
-
-## Release
-
-Versions are CalVer (`YYYY.MM.DD-beta.N`). Tags are bare for core and prefixed
-for adapters: `brayer-openclaw-<calver>` and `brayer-opencode-<calver>`.
-Prereleases publish to `beta`; stable tags publish to `latest`.
+A brayer is the printer's small hand roller that applies ink evenly to type. It
+does not rewrite the page, and it does not keep the manuscript. It puts the ink
+exactly where the work needs it. Brayer applies context to the work — the order,
+the checkpoint, the proof, the decision — instead of piling another transcript
+into the context window.
 
 ## Development
 
