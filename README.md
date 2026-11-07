@@ -138,21 +138,42 @@ One pipe per harness instead:
 
 **OpenCode** — `@igorjpimenta/brayer-opencode` stamps identity on every Brayer MCP tool call. It needs the Brayer MCP server configured and `BRAYER_AGENT` when the session agent cannot be captured.
 
+OpenCode reads config from `opencode.json(c)` (project root or `.opencode/`,
+global at `~/.config/opencode/`, system at `/Library/Application Support/opencode`),
+and also ships a CLI (`opencode mcp add`, `opencode plugin add`). V1 configs
+(`"mcp": { "brayer": … }`, `"plugin": […]`) normalize into V2, but write V2
+canonical form for new setup:
+
 ```json
 {
+  "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "brayer": {
-      "type": "remote",
-      "url": "http://127.0.0.1:38293/mcp",
-      "headers": {
-        "X-Brayer-Harness": "opencode",
-        "Authorization": "Bearer <BRAYER_MCP_BEARER>"
+    "servers": {
+      "brayer": {
+        "type": "remote",
+        "url": "http://127.0.0.1:38293/mcp",
+        "headers": {
+          "X-Brayer-Harness": "opencode",
+          "Authorization": "Bearer <BRAYER_MCP_BEARER>"
+        }
       }
     }
   },
-  "plugin": ["@igorjpimenta/brayer-opencode"]
+  "plugins": ["@igorjpimenta/brayer-opencode"]
 }
 ```
+
+Or via the CLI:
+
+```sh
+opencode mcp add brayer --url http://127.0.0.1:38293/mcp \
+  --header "X-Brayer-Harness=opencode" \
+  --header "Authorization=Bearer <BRAYER_MCP_BEARER>"
+opencode plugin add @igorjpimenta/brayer-opencode
+```
+
+Plugins also auto-discover from `.opencode/plugins/` directories (project or
+global config dir).
 
 Automatic checkpoint/resume is not part of the OpenCode adapter; the agent uses
 the Brayer MCP tools directly. The optional `brayer-wake` bin receives the claim
