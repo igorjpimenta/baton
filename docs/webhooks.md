@@ -18,7 +18,12 @@ brayer webhook set --harness opencode \
 brayer webhook test --harness opencode
 ```
 
-The OpenClaw adapter exposes its receiver at `POST /api/brayer/claimed`.
+The OpenClaw adapter exposes its receiver at `POST /api/brayer/claimed` **on
+the gateway's own HTTP server** — OpenClaw needs no external bridge, because
+the plugin validates the bearer and wakes the claiming agent immediately via
+`workflow.scheduleSessionTurn` (a one-shot `brayer-claim-<order-id>` turn,
+deleted after run). OpenCode, a stateless CLI, cannot accept webhooks directly
+— that is what the wake bridge below exists for.
 
 ## Wake bridge (`brayer-wake`)
 
