@@ -34,6 +34,12 @@ The OpenClaw adapter reads no environment: its transport config lives in
 `X-Brayer-Harness`), and its claim webhook route is registered in the store via
 `brayer webhook set` rather than an env ([webhooks](webhooks.md)).
 
+Package shape differs by design: the OpenClaw adapter opens the store directly
+from the core daemon's code, so `@igorjpimenta/brayer` is a declared
+dependency of `@igorjpimenta/brayer-openclaw`; the OpenCode adapter is
+standalone (`@igorjpimenta/brayer-opencode` carries its own stamping code and
+nothing from the core package).
+
 Flags on `brayer serve` override ports per launch: `--mcp http --port N`,
 `--host H`, `--ws --port N`.
 
