@@ -94,7 +94,7 @@ test("mints one session per harness declaration", async () => {
   }
 });
 
-test("refuses a mint without X-Brayer-Harness", async () => {
+test("refuses a mint without X-Brayer-Harness even when env claims a harness", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-http-"));
   const store = createStore({ dbPath: path.join(dir, "store.sqlite") });
   const server = await startMcpHttpServer({ store, port: 0, bearer: "secret" });
@@ -113,6 +113,13 @@ test("refuses a mint without X-Brayer-Harness", async () => {
       body: "{}",
     });
     assert.equal(reserved.status, 400);
+
+    const anyReserved = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: "POST",
+      headers: { Authorization: "Bearer secret", "X-Brayer-Harness": "any", "content-type": "application/json" },
+      body: "{}",
+    });
+    assert.equal(anyReserved.status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     store.close();
