@@ -20,6 +20,7 @@
     "index.js",
     "hooks.js",
     "identity.js",
+    "setup.js",
     "wake.js",
     "bin/"
   ],

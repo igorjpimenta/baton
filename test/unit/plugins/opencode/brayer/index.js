@@ -40,3 +40,30 @@ test("captures the agent from chat message as a fallback", async () => {
   await hooks["tool.execute.before"]({ tool: "brayer_order_get", sessionID: "ses_2" }, output);
   assert.equal(output.args.brayer_agent, "build");
 });
+
+test("the entry keeps the identity and both entrypoints", async () => {
+  const mod = await import("../../../../../plugins/opencode/brayer/index.js");
+  assert.equal(mod.default.id, "brayer");
+  assert.equal(typeof mod.default.setup, "function");
+  assert.equal(typeof mod.default.server, "function");
+});
+
+test("setup learns the agent from the session context hook and stamps the tool input", async () => {
+  const { setup } = await import("../../../../../plugins/opencode/brayer/setup.js");
+  const hooks = {};
+  const ctx = {
+    session: { hook: async (name, callback) => { hooks[name] = callback; return { dispose() {} }; } },
+    tool: { hook: async (name, callback) => { hooks[name] = callback; return { dispose() {} }; } },
+  };
+  const cleanup = await setup(ctx);
+
+  hooks.context({ sessionID: "ses_2", agent: "build" });
+  const event = { tool: "brayer_order_get", sessionID: "ses_2", input: { brayer_agent: "forged" } };
+  hooks["execute.before"](event);
+
+  assert.deepEqual(event.input, {
+    brayer_agent: "build",
+    brayer_session: "ses_2",
+  });
+  assert.equal(typeof cleanup, "function");
+});
