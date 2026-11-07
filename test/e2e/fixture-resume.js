@@ -16,7 +16,7 @@ const identity = `${harness}:worker:s1`;
 
 const store = createStore({
   dbPath: process.env.BRAYER_DB,
-  config: { blobsPath: process.env.BRAYER_BLOBS },
+  config: { blobsPath: process.env.BRAYER_BLOBS, claimWebhookUrl: "http://127.0.0.1:9/claimed" },
 });
 
 function fail(message) {
