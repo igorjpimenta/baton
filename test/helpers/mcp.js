@@ -12,7 +12,7 @@ export async function withClient(fn) {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-mcp-"));
   const store = createStore({
     dbPath: path.join(dir, "store.sqlite"),
-    config: { blobsPath: path.join(dir, "blobs") },
+    config: { blobsPath: path.join(dir, "blobs"), claimWebhookUrl: "http://127.0.0.1:9/claimed" },
   });
   const server = createMcpServer({ store, base: { harness: "test" } });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

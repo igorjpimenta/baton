@@ -18,11 +18,11 @@ test("process env never mints a declaration", () => {
   }
 });
 
-test("reserved harness names refuse the declaration", () => {
-  assert.throws(() => assertDeclaration({ harness: "unknown" }), /refused declaration \(reserved: harness\)/);
-  assert.throws(() => assertDeclaration({ harness: "instance:7" }), /refused declaration \(reserved: harness\)/);
-  assert.throws(() => assertDeclaration({ harness: "any" }), /refused declaration \(reserved: harness\)/);
-  assert.throws(() => assertDeclaration({ harness: " unknown " }), /refused declaration/);
+test("any non-empty harness name mints a declaration", () => {
+  assert.equal(assertDeclaration({ harness: "unknown" }).harness, "unknown");
+  assert.equal(assertDeclaration({ harness: "any" }).harness, "any");
+  assert.equal(assertDeclaration({ harness: "instance:7" }).harness, "instance:7");
+  assert.equal(assertDeclaration({ harness: " unknown " }).harness, "unknown");
 });
 
 test("meta stamp wins over args and no halves splice", () => {

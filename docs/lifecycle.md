@@ -87,8 +87,13 @@ Approve requires at least one evidence row on the attempt
 Every mutating call carries a full `harness:agent:session` identity. The store
 refuses the call — the order is untouched — when:
 
-- the harness is missing, or the reserved name `any`
-  ([`src/identity.js`](../src/identity.js));
+- the harness is missing (any non-empty name is accepted; deliverability is
+  checked at claim time, not by name);
+- a claim is made for an undeclared wake route — a claimed order that no one
+  could be woken for is invisible work, so
+  `brayer_order_claim` / `brayer_order_next` refuse with instructions to
+  register the route (`brayer webhook set --harness <h>` or the claim-webhook
+  config);
 - agent/session halves arrive in different channels (one via `_meta.brayer`,
   one via args) — *pairs never splice*;
 - a forged or mismatched identity reaches a call gated by the adapter.

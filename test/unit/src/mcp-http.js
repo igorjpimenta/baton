@@ -10,7 +10,7 @@ import { startMcpHttpServer } from "../../../src/mcp.js";
 
 test("serves MCP over HTTP behind bearer auth", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-http-"));
-  const store = createStore({ dbPath: path.join(dir, "store.sqlite") });
+const store = createStore({ dbPath: path.join(dir, "store.sqlite"), config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   const server = await startMcpHttpServer({
     store,
     base: { harness: "test" },
@@ -49,7 +49,7 @@ test("serves MCP over HTTP behind bearer auth", async () => {
 
 test("mints one session per harness declaration", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-http-"));
-  const store = createStore({ dbPath: path.join(dir, "store.sqlite") });
+const store = createStore({ dbPath: path.join(dir, "store.sqlite"), config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   const server = await startMcpHttpServer({ store, port: 0, bearer: "secret" });
   const port = server.address().port;
   try {
@@ -96,7 +96,7 @@ test("mints one session per harness declaration", async () => {
 
 test("refuses a mint without X-Brayer-Harness even when env claims a harness", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-http-"));
-  const store = createStore({ dbPath: path.join(dir, "store.sqlite") });
+  const store = createStore({ dbPath: path.join(dir, "store.sqlite"), config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   const server = await startMcpHttpServer({ store, port: 0, bearer: "secret" });
   const port = server.address().port;
   try {
@@ -107,19 +107,13 @@ test("refuses a mint without X-Brayer-Harness even when env claims a harness", a
     });
     assert.equal(denied.status, 400);
 
-    const reserved = await fetch(`http://127.0.0.1:${port}/mcp`, {
+    // header mint ignores env; an empty header is the only 400 shape here
+    const empty = await fetch(`http://127.0.0.1:${port}/mcp`, {
       method: "POST",
-      headers: { Authorization: "Bearer secret", "X-Brayer-Harness": "unknown", "content-type": "application/json" },
+      headers: { Authorization: "Bearer secret", "X-Brayer-Harness": "   ", "content-type": "application/json" },
       body: "{}",
     });
-    assert.equal(reserved.status, 400);
-
-    const anyReserved = await fetch(`http://127.0.0.1:${port}/mcp`, {
-      method: "POST",
-      headers: { Authorization: "Bearer secret", "X-Brayer-Harness": "any", "content-type": "application/json" },
-      body: "{}",
-    });
-    assert.equal(anyReserved.status, 400);
+    assert.equal(empty.status, 400);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     store.close();

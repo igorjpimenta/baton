@@ -90,7 +90,9 @@ Every call is keyed `harness:agent:session`, and the harness is declared per **c
 | stdio | `BRAYER_HARNESS` env at launch | one pipe per harness |
 | HTTP | `X-Brayer-Harness` header on the session's first request | one shared daemon, all harnesses |
 
-The agent and session halves are stamped per call as a whole pair, in **one** channel: either `_meta.brayer` (`{ agent, session, harness }`) or flat `brayer_agent` / `brayer_session` arguments — halves never splice across channels. Mutating calls without a full pair refuse; the adapters do this stamping automatically. The harness name `any` is reserved and refused. See [lifecycle](docs/lifecycle.md) for the exact refusal contract.
+The agent and session halves are stamped per call as a whole pair, in **one** channel: either `_meta.brayer` (`{ agent, session, harness }`) or flat `brayer_agent` / `brayer_session` arguments — halves never splice across channels. Mutating calls without a full pair refuse; the adapters do this stamping automatically.
+
+Any non-empty harness name mints a session; deliverability is validated where it matters, at claim time: `brayer_order_claim` and `brayer_order_next` refuse unless the harness has a wake route registered (`brayer webhook set --harness <name>`, or `BRAYER_CLAIM_WEBHOOKS` / `BRAYER_CLAIM_WEBHOOK_URL`) — a claim nobody could be woken for is invisible work. See [lifecycle](docs/lifecycle.md).
 
 ## Harnesses
 

@@ -22,6 +22,11 @@ Resolved in [`src/config.js`](../src/config.js).
 | Claim webhook timeout | `BRAYER_CLAIM_WEBHOOK_TIMEOUT_MS` | `3000` |
 | Per-harness webhook map | `BRAYER_CLAIM_WEBHOOKS` | `{}` |
 
+The claim webhook entries double as the claim gate: a harness without any of
+these routes (DB row, per-harness entry, or global URL) cannot claim orders,
+because a claimed order nobody could be woken for would be invisible
+([lifecycle](lifecycle.md#identity-refusal-contract)).
+
 Harness-side identity knobs:
 
 | Knob | Applies to | Notes |

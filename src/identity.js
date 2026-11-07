@@ -1,12 +1,9 @@
-// A usable layer names something: non-empty, and neither of the tokens no
-// key may carry ("unknown", "any", "instance:*" — "any" was the shared-HTTP
-// env sentinel; the header mint makes it meaningless as a harness name).
+// A usable layer names something: non-empty. No name is blocked here — a
+// declared harness only has to be deliverable, which the claim gate checks
+// against the register of wake routes (webhook_targets / claimWebhooks) at
+// claim time, not by guessing meanings from the name.
 function isUsableLayer(v) {
-  return (
-    typeof v === "string" &&
-    v.trim() !== "" &&
-    !/^(unknown|any|instance:.*)$/i.test(v.trim())
-  );
+  return typeof v === "string" && v.trim() !== "";
 }
 
 // The declaration arrives only from the caller side — never from process env.
@@ -19,9 +16,6 @@ export function assertDeclaration(base = {}) {
   const harness = base?.harness;
   if (typeof harness !== "string" || !harness.trim()) {
     throw new Error("brayer: harness must be declared (BRAYER_HARNESS env for stdio serve, X-Brayer-Harness header for HTTP)");
-  }
-  if (!isUsableLayer(harness)) {
-    throw new Error(`brayer: refused declaration (reserved: harness). "${harness}" cannot identify a consumer — declare the real harness name.`);
   }
   return { ...base, harness: harness.trim() };
 }
