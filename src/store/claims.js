@@ -1,8 +1,17 @@
 import { now } from "./util.js";
 
-export function createClaimApi({ db, cfg, insertEvent, orderApi, notifyClaim, logger }) {
+export function createClaimApi({ db, cfg, insertEvent, orderApi, notifyClaim, claimGate, logger }) {
   const timers = new Map();
   const MAX_TIMER_MS = 2147483647;
+
+  // The claim must be wake-deliverable: agentId carries harness as its first
+  // segment (identityKey = harness:agent:session). A claim nobody could be
+  // woken for is invisible work.
+  function requireClaimable(agentId) {
+    if (!claimGate) return;
+    const harness = String(agentId).split(":")[0] ?? "";
+    claimGate(harness);
+  }
 
   function clearExpiry(id) {
     const timer = timers.get(id);
@@ -34,6 +43,7 @@ export function createClaimApi({ db, cfg, insertEvent, orderApi, notifyClaim, lo
     claimById({ id, agentId, sessionRef = null, leaseSeconds = cfg.leaseSeconds } = {}) {
       if (!id) throw new Error("order id is required");
       if (!agentId) throw new Error("agentId is required");
+      requireClaimable(agentId);
       const t = now();
       const expires = t + leaseSeconds * 1000;
       db.exec("BEGIN IMMEDIATE");
@@ -68,6 +78,7 @@ export function createClaimApi({ db, cfg, insertEvent, orderApi, notifyClaim, lo
 
     claimNext({ agentId, sessionRef = null, leaseSeconds = cfg.leaseSeconds } = {}) {
       if (!agentId) throw new Error("agentId is required");
+      requireClaimable(agentId);
       const candidates = db.prepare(`
         SELECT id FROM work_orders
          WHERE status='ready' AND (assignee IS NULL OR assignee=?)

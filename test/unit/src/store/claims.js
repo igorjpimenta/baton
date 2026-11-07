@@ -7,8 +7,7 @@ import { createStore } from "../../../../src/store.js";
 import { withStore, withTempDir } from "../../../helpers/store.js";
 import { readyOrder } from "../../../helpers/fixtures.js";
 
-test("claims a ready order once", () => withStore((store) => {
-  const order = readyOrder(store);
+test("claims a ready order once", () => withStore((store) => {  const order = readyOrder(store);
   const first = store.claim.claimById({ id: order.id, agentId: "claude:worker:s1" });
   assert.equal(first.claimed.status, "claimed");
   assert.equal(first.claimed.assignee, "claude:worker:s1");
@@ -68,8 +67,8 @@ test("sweep blocks after the attempt cap", () => withStore((store) => {
 
 test("two stores race and only one claim wins", () => withTempDir((dir) => {
   const dbPath = path.join(dir, "store.sqlite");
-  const a = createStore({ dbPath });
-  const b = createStore({ dbPath });
+  const a = createStore({ dbPath, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
+  const b = createStore({ dbPath, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   try {
     const order = readyOrder(a);
     const one = a.claim.claimById({ id: order.id, agentId: "claude:a:s1" });
@@ -86,7 +85,7 @@ test("two stores race and only one claim wins", () => withTempDir((dir) => {
 test("automatically sweeps an expired lease", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-auto-sweep-"));
   const dbPath = path.join(dir, "store.sqlite");
-  const store = createStore({ dbPath });
+  const store = createStore({ dbPath, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   try {
     const order = readyOrder(store);
     store.claim.claimById({ id: order.id, agentId: "claude:worker:s1", leaseSeconds: 0.2 });
@@ -102,7 +101,7 @@ test("automatically sweeps an expired lease", async () => {
 test("heartbeat reschedules the automatic sweep", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-auto-sweep-"));
   const dbPath = path.join(dir, "store.sqlite");
-  const store = createStore({ dbPath });
+  const store = createStore({ dbPath, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   try {
     const order = readyOrder(store);
     store.claim.claimById({ id: order.id, agentId: "claude:worker:s1", leaseSeconds: 0.2 });
@@ -121,7 +120,7 @@ test("heartbeat reschedules the automatic sweep", async () => {
 test("finishing an attempt cancels the automatic sweep", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-auto-sweep-"));
   const dbPath = path.join(dir, "store.sqlite");
-  const store = createStore({ dbPath });
+  const store = createStore({ dbPath, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   try {
     const order = readyOrder(store);
     const claimed = store.claim.claimById({ id: order.id, agentId: "claude:worker:s1", leaseSeconds: 0.2 }).claimed;
@@ -131,6 +130,56 @@ test("finishing an attempt cancels the automatic sweep", async () => {
     assert.equal(store.order.get(order.id).status, "ready");
     assert.equal(store.order.get(order.id).attemptCount, 1);
     assert.ok(!store.event.list({ workOrderId: order.id }).some((event) => event.kind === "order.blocked"));
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("claim refuses a harness with no wake route", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "brayer-claim-gate-"));
+  const store = createStore({ dbPath: path.join(dir, "store.sqlite") });
+  try {
+    const order = readyOrder(store);
+    assert.throws(
+      () => store.claim.claimById({ id: order.id, agentId: "ghost:worker:s1" }),
+      /has no claim wake route/
+    );
+    assert.equal(store.order.get(order.id).status, "ready");
+    assert.throws(
+      () => store.claim.claimNext({ agentId: "ghost:worker:s1" }),
+      /has no claim wake route/
+    );
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a registered per-harness route makes the harness claimable", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "brayer-claim-gate-route-"));
+  const store = createStore({ dbPath: path.join(dir, "store.sqlite"), config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
+  try {
+    store.webhook.upsert({ harness: "wakey", url: "http://127.0.0.1:9/claimed", bearer: "b" });
+    const order = readyOrder(store);
+    const res = store.claim.claimById({ id: order.id, agentId: "wakey:worker:s1" });
+    assert.equal(res.claimed.status, "claimed");
+  } finally {
+    store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a global fallback route makes every harness claimable", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "brayer-claim-gate-global-"));
+  const store = createStore({
+    dbPath: path.join(dir, "store.sqlite"),
+    config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" },
+  });
+  try {
+    const order = readyOrder(store);
+    const res = store.claim.claimById({ id: order.id, agentId: "anyharness:worker:s1" });
+    assert.equal(res.claimed.status, "claimed");
   } finally {
     store.close();
     rmSync(dir, { recursive: true, force: true });

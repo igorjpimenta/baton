@@ -42,7 +42,7 @@ test("proves true resume across reject and escalate verdicts", async () => {
       const blobsPath = path.join(dir, "blobs");
       const evidencePath = path.join(dir, "evidence.txt");
       writeFileSync(evidencePath, `${harness} ${decision} retry proof\n`);
-      const setup = createStore({ dbPath, config: { blobsPath } });
+      const setup = createStore({ dbPath, config: { blobsPath, claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
       const order = setup.order.create({
         title: `${decision} resume`,
         goal: "prove retry after verdict",
@@ -75,7 +75,7 @@ test("proves true resume across reject and escalate verdicts", async () => {
       assert.notEqual(retryOut.attemptId, verdictOut.attemptId);
       assert.equal(retryOut.resumedCheckpointId, verdictOut.checkpointId);
 
-      const check = createStore({ dbPath, config: { blobsPath } });
+      const check = createStore({ dbPath, config: { blobsPath, claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
       try {
         const final = check.order.get(order.id);
         assert.equal(final.status, "approved");

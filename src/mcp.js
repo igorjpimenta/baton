@@ -27,7 +27,8 @@ export function createMcpServer({ store, base, logger } = {}) {
       async (args, extra) => {
         try {
           const identity = resolveIdentity({ meta: extra?._meta, args, base: declared });
-          logger?.info?.(`brayer: ${def.name} from ${identity.harness}:${identity.agent}:${identity.session}`);
+          const metaKeys = extra?._meta ? Object.keys(extra._meta).sort().join(",") : "-";
+          logger?.info?.(`brayer: ${def.name} from ${identity.harness}:${identity.agent}:${identity.session} via=${identity.via} metaKeys=${metaKeys}`);
           const result = await handle(def.name, args, identity);
           return { content: [{ type: "text", text: JSON.stringify(result) }] };
         } catch (err) {
@@ -122,8 +123,8 @@ export async function startMcpHttpServer({
       return;
     }
 
-    // New session: read the declared harness, refuse unusable names, then
-    // mint the session-scoped server and register it by response header.
+    // New session: read the declared harness, refuse an empty one, then mint
+    // the session-scoped server and register it by response header.
     const header = req.headers["x-brayer-harness"];
     const headerValue = Array.isArray(header) ? header[0] : header;
     let minted;
@@ -131,7 +132,7 @@ export async function startMcpHttpServer({
       minted = assertDeclaration({ harness: headerValue });
     } catch {
       res.writeHead(400, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "missing or reserved X-Brayer-Harness" }));
+      res.end(JSON.stringify({ error: "missing X-Brayer-Harness" }));
       return;
     }
     const mcp = createMcpServer({ store, base: minted, logger });
