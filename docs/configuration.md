@@ -29,6 +29,11 @@ Harness-side identity knobs:
 | `BRAYER_HARNESS` | stdio MCP and the event stream | required for stdio; must not cross into HTTP minting |
 | `BRAYER_AGENT` | OpenCode adapter | fallback when the session agent cannot be captured |
 
+The OpenClaw adapter reads no environment: its transport config lives in
+`openclaw.json` (`mcp.servers.brayer.headers`, incl.
+`X-Brayer-Harness`), and its claim webhook route is registered in the store via
+`brayer webhook set` rather than an env ([webhooks](webhooks.md)).
+
 Flags on `brayer serve` override ports per launch: `--mcp http --port N`,
 `--host H`, `--ws --port N`.
 
