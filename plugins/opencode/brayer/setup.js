@@ -1,16 +1,15 @@
-// v2.js — OpenCode 2 entry for the brayer companion.
-//
-// V2 registers each hook on the domain that owns it instead of returning a
-// hooks object, and the request context carries the agent on the session hook
-// rather than on a chat event. The stamp itself is unchanged: the same
-// overwrite-unconditionally rule applies, because a model-supplied pair must
-// never survive either entry.
+// setup.js — the entry. Hosts read it from the default export; the legacy
+// server() in index.js gives a V1 host the object-hook form of the same
+// behavior. V2 registers each hook on the domain that owns it, and the agent
+// arrives on the session context hook rather than a chat event. The stamp is
+// unchanged from the V1 side: the same overwrite-unconditionally rule applies,
+// because a model-supplied pair must never survive on either host.
 
 import { stampBrayerIdentity } from "./identity.js";
 
-export async function setupBrayer(ctx) {
+export async function setup(ctx) {
   // sessionID → agent, learned once per request. The context hook is the only
-  // v2 surface that names the agent for a turn, and it runs immediately before
+  // surface that names the agent for a turn, and it runs immediately before
   // the model request that may call a brayer tool.
   const agents = new Map();
 

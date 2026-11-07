@@ -1,11 +1,13 @@
 import { createBrayerHooks } from "./hooks.js";
-import { setupBrayer } from "./v2.js";
+import { setup } from "./setup.js";
 
-export async function BrayerPlugin() {
+// The legacy V1 path object-hook form, kept until the compatibility window
+// closes. V1 hosts call server(); they cannot read id/setup().
+export async function BrayerLegacy() {
   return createBrayerHooks();
 }
 
-// One package, two runtimes: V1 calls server() and uses the returned hooks;
-// V2 reads id and setup() and registers on the context. Each entry stays on its
-// own API — sharing the export does not translate one into the other.
-export default { id: "brayer", setup: setupBrayer, server: BrayerPlugin };
+// setup() first: it is the entry. server() is the legacy V1 path. Each side
+// stays on its own API — sharing the export does not translate one into the
+// other.
+export default { id: "brayer", setup, server: BrayerLegacy };
