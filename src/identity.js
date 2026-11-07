@@ -1,25 +1,21 @@
-// A usable layer names something: non-empty, and neither of the two tokens
-// no key may carry ("unknown", "instance:*").
+// A usable layer names something: non-empty. No name is blocked here — a
+// declared harness only has to be deliverable, which the claim gate checks
+// against the register of wake routes (webhook_targets / claimWebhooks) at
+// claim time, not by guessing meanings from the name.
 function isUsableLayer(v) {
-  return (
-    typeof v === "string" &&
-    v.trim() !== "" &&
-    !/^(unknown|instance:.*)$/i.test(v.trim())
-  );
+  return typeof v === "string" && v.trim() !== "";
 }
 
-// The server is constructed with the harness it serves; the mint decides
-// what that is per transport — BRAYER_HARNESS env for one-to-one stdio, the
-// X-Brayer-Harness header at session creation for shared HTTP. Agent and
-// session are never declared: they arrive per call, stamped by the calling
-// harness's companion plugin.
+// The declaration arrives only from the caller side — never from process env.
+// serve() injects BRAYER_HARNESS as the stdio base (one-to-one pipe); the
+// shared HTTP mint passes the X-Brayer-Harness header at session creation.
+// Keeping the env read out of here is what stops a streaming session from
+// ever minting a construction-time harness. Agent and session are never
+// declared: they arrive per call, stamped by the calling harness's plugin.
 export function assertDeclaration(base = {}) {
-  const harness = base.harness ?? process.env.BRAYER_HARNESS;
+  const harness = base?.harness;
   if (typeof harness !== "string" || !harness.trim()) {
-    throw new Error("brayer: BRAYER_HARNESS is required");
-  }
-  if (/^(unknown|instance:.*)$/i.test(harness.trim())) {
-    throw new Error(`brayer: refused declaration (reserved: harness). "${harness}" cannot identify a consumer — declare the real harness name.`);
+    throw new Error("brayer: harness must be declared (BRAYER_HARNESS env for stdio serve, X-Brayer-Harness header for HTTP)");
   }
   return { ...base, harness: harness.trim() };
 }

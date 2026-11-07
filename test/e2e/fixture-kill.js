@@ -5,7 +5,7 @@ const harness = process.env.BRAYER_TEST_HARNESS;
 const orderId = process.env.BRAYER_TEST_ORDER;
 const session = { harness, agent: "worker", session: "s1" };
 
-const store = createStore({ dbPath: process.env.BRAYER_DB });
+const store = createStore({ dbPath: process.env.BRAYER_DB, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
 const attached = attachSession({ store, session, orderId });
 checkpointSession({
   store,

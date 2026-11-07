@@ -30,7 +30,7 @@ test("resumes an order after the adapter process is killed", async () => {
   for (const harness of ["opencode", "openclaw"]) {
     const dir = mkdtempSync(path.join(tmpdir(), `brayer-e2e-${harness}-`));
     const dbPath = path.join(dir, "store.sqlite");
-    const first = createStore({ dbPath });
+    const first = createStore({ dbPath, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
     const order = first.order.create({
       title: "kill resume",
       goal: "resume from checkpoint",
@@ -41,7 +41,7 @@ test("resumes an order after the adapter process is killed", async () => {
 
     await killAdapter({ dbPath, orderId: order.id, harness });
 
-    const second = createStore({ dbPath });
+    const second = createStore({ dbPath, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
     try {
       const resumed = resumeSession({
         store: second,

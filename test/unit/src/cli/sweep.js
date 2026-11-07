@@ -10,7 +10,7 @@ import { readyOrder } from "../../../helpers/fixtures.js";
 test("sweeps expired leases", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-sweep-"));
   const dbPath = path.join(dir, "store.sqlite");
-  const store = createStore({ dbPath, config: { leaseSeconds: 1 } });
+  const store = createStore({ dbPath, config: { leaseSeconds: 1, claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   try {
     const order = readyOrder(store);
     store.claim.claimById({ id: order.id, agentId: "claude:worker:s1", leaseSeconds: 0 });
@@ -26,7 +26,7 @@ test("sweeps expired leases", () => {
 test("blocks an order at the attempt cap", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-sweep-"));
   const dbPath = path.join(dir, "store.sqlite");
-  const store = createStore({ dbPath, config: { maxAttempts: 1 } });
+  const store = createStore({ dbPath, config: { maxAttempts: 1, claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   try {
     const order = readyOrder(store);
     store.claim.claimById({ id: order.id, agentId: "claude:worker:s1", leaseSeconds: 0 });
@@ -42,7 +42,7 @@ test("blocks an order at the attempt cap", () => {
 test("does not sweep live leases", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "brayer-sweep-"));
   const dbPath = path.join(dir, "store.sqlite");
-  const store = createStore({ dbPath });
+  const store = createStore({ dbPath, config: { claimWebhookUrl: "http://127.0.0.1:9/claimed" } });
   try {
     const order = readyOrder(store);
     store.claim.claimById({ id: order.id, agentId: "claude:worker:s1", leaseSeconds: 3600 });

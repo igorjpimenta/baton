@@ -8,7 +8,12 @@ export function withStore(fn) {
   const dbPath = path.join(dir, "store.sqlite");
   const store = createStore({
     dbPath,
-    config: { blobsPath: path.join(dir, "blobs") },
+    config: {
+      blobsPath: path.join(dir, "blobs"),
+      // global fallback keeps every harness claimable; tests that exercise the
+      // claim gate build their own store without it
+      claimWebhookUrl: "http://127.0.0.1:9/claimed",
+    },
   });
   try {
     return fn(store, dir, dbPath);
