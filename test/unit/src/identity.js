@@ -3,13 +3,25 @@ import assert from "node:assert/strict";
 import { assertDeclaration, resolveIdentity, identityKey } from "../../../src/identity.js";
 
 test("declaration is required", () => {
-  assert.throws(() => assertDeclaration({}), /BRAYER_HARNESS is required/);
+  assert.throws(() => assertDeclaration({}), /harness must be declared/);
   assert.equal(assertDeclaration({ harness: "claude" }).harness, "claude");
+});
+
+test("process env never mints a declaration", () => {
+  const prev = process.env.BRAYER_HARNESS;
+  process.env.BRAYER_HARNESS = "any";
+  try {
+    assert.throws(() => assertDeclaration({}), /harness must be declared/);
+  } finally {
+    if (prev === undefined) delete process.env.BRAYER_HARNESS;
+    else process.env.BRAYER_HARNESS = prev;
+  }
 });
 
 test("reserved harness names refuse the declaration", () => {
   assert.throws(() => assertDeclaration({ harness: "unknown" }), /refused declaration \(reserved: harness\)/);
   assert.throws(() => assertDeclaration({ harness: "instance:7" }), /refused declaration \(reserved: harness\)/);
+  assert.throws(() => assertDeclaration({ harness: "any" }), /refused declaration \(reserved: harness\)/);
   assert.throws(() => assertDeclaration({ harness: " unknown " }), /refused declaration/);
 });
 
